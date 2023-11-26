@@ -4,7 +4,7 @@
 #include<fstream>
 #include<string>
 
-#define feature_num 5
+#define feature_num 30
 using namespace std;
 
 vector<double> expectedOutput;
@@ -12,64 +12,84 @@ vector<vector<double>> inputValues;
 
 vector<double> Validation_expectedOutput;
 vector<vector<double>> Validation_inputValues;
+vector<string> dataFiles = {"data.csv"};
+string validationFile = "validation.csv";
 
-
-double e = 2.71828;
-long epoch = 100;
+double e;
+long epoch;
 double weight[feature_num]={0};
-double learningRate = 0.001;
+double learningRate;
 
 
 double activation(double z);
 void updateWeight(double predicted, double expected, vector<double> inputs);
 void calculateAccuracy();
 void test();
-void datainput(vector<double> &expectedOutput1, vector<vector<double>> &inputValues1);
+void datainput(vector<double> &expectedOutput1, vector<vector<double>> &inputValues1, string filename);
 void datastandarization(vector<vector<double>> &inputValues2);
+void initializeParameters();
+
+
 int main()
 {
-  cout<<"Training Data File Name: ";
-  datainput(expectedOutput,inputValues);
-  datastandarization(inputValues);
-  for(int i = 0;i < feature_num;i++)
-  {
-    weight[i] = 0.01;
-  }
-  //check values for proper input into vectors
-  // for(int i = 0; i < inputValues.size(); i++) 
-  // {
-  //   for(int j = 0; j < feature_num; j++) 
-  //   {
-  //     cout<<inputValues[i][j]<<" ";
-  //   }
-  //   cout<<endl;
-  // }
-  // cout<<"inputValues.size(); = "<<inputValues.size()<<endl; 
-  // inputValues.size() = 469
-  // cout<<"inputValues[0].size(); = "<<inputValues[0].size()<<endl; 
-  // inputValues[0].size() = 31
-   
-  while(epoch--) 
-  {
-      cout<<"Epoch "<<(100-epoch)<<" ";
-      calculateAccuracy();
-      for(int i = 0; i < inputValues.size(); i++) 
-      {
-          double predictedValue, z = 0;
-          for(int j = 1; j < inputValues[0].size(); j++) 
-          {
-            z += weight[j-1] * inputValues[i][j];
-          }
-          predictedValue = activation(z);
-          updateWeight(predictedValue, expectedOutput[i], inputValues[i]);
-      }
-  }
-  calculateAccuracy();
+  for(int i=0; i<dataFiles.size(); i++){
+    initializeParameters();
+    cout << "Data file name is "<< dataFiles[i];
+    datainput(expectedOutput, inputValues, dataFiles[i]);
+    datastandarization(inputValues);
+    for(int i = 0;i < feature_num;i++)
+    {
+      weight[i] = 0.01;
+    }
+    //check values for proper input into vectors
+    // for(int i = 0; i < inputValues.size(); i++) 
+    // {
+    //   for(int j = 0; j < feature_num; j++) 
+    //   {
+    //     cout<<inputValues[i][j]<<" ";
+    //   }
+    //   cout<<endl;
+    // }
+    // cout<<"inputValues.size(); = "<<inputValues.size()<<endl; 
+    // inputValues.size() = 469
+    // cout<<"inputValues[0].size(); = "<<inputValues[0].size()<<endl; 
+    // inputValues[0].size() = 31
+    
+    while(epoch--) 
+    {
+        cout<<"Epoch "<<(100-epoch)<<" ";
+        calculateAccuracy();
+        for(int i = 0; i < inputValues.size(); i++) 
+        {
+            double predictedValue, z = 0;
+            for(int j = 1; j < inputValues[0].size(); j++) 
+            {
+              z += weight[j-1] * inputValues[i][j];
+            }
+            predictedValue = activation(z);
+            updateWeight(predictedValue, expectedOutput[i], inputValues[i]);
+        }
+    }
+    calculateAccuracy();
 
+    
+  }
   test();
   return 0 ;
 }
 
+
+void initializeParameters()
+{
+  Validation_expectedOutput.clear();
+  Validation_inputValues.clear();
+  expectedOutput.clear();
+  inputValues.clear();
+  e = 2.71828;
+  epoch = 100;
+  weight[feature_num]={0};
+  learningRate = 0.001;
+}
 
 double activation(double z) 
 {
@@ -113,8 +133,8 @@ void test()
 {
   double z = 0;
   int totalCorrect = 0;
-  cout<<"Validation Data File Name: ";
-  datainput(Validation_expectedOutput, Validation_inputValues);
+  cout<<"Validation Data File Name: " << validationFile;
+  datainput(Validation_expectedOutput, Validation_inputValues, validationFile);
   datastandarization(Validation_inputValues);
   for(int i = 0; i < Validation_inputValues.size(); i++) 
   {
@@ -134,23 +154,20 @@ void test()
   cout<<"Validation Accuracy is: "<<(totalCorrect * 100) / Validation_inputValues.size()<<"%"<<endl;
 }
 
-void datainput(vector<double> &expectedOutput1, vector<vector<double>> &inputValues1)
+void datainput(vector<double> &expectedOutput1, vector<vector<double>> &inputValues1, string filename)
 {
   // open a file in write mode.
   ifstream myfile;
-  string line,filename;
-  cin>>filename;
+  string line;
   myfile.open(filename);  
   if (!myfile)
   {                 
-    cout<<"Error while creating the file\n";    
+    cout<<"Error while opening the file\n";    
   }
   else
   {
-    cout<<"File created successfully\n";          
+    cout<<"File opened  successfully\n";          
   }
-
-
   getline(myfile,line);//to skip the first catagory sentense
   while(getline(myfile,line)) // input data into C++
   {
