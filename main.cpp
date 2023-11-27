@@ -3,6 +3,7 @@
 #include<math.h>
 #include<fstream>
 #include<string>
+#include <mpi.h>
 
 #define feature_num 30
 using namespace std;
@@ -19,7 +20,10 @@ double e;
 long epoch;
 double weight[feature_num]={0};
 double learningRate;
+int globalrank;
 
+char processor_name[MPI_MAX_PROCESSOR_NAME];
+int name_len;
 
 double activation(double z);
 void updateWeight(double predicted, double expected, vector<double> inputs);
@@ -27,57 +31,66 @@ void calculateAccuracy();
 void test();
 void datainput(vector<double> &expectedOutput1, vector<vector<double>> &inputValues1, string filename);
 void datastandarization(vector<vector<double>> &inputValues2);
+void trainlogisticregressionmodel();
 void initializeParameters();
 
 
 int main()
 {
-  for(int i=0; i<dataFiles.size(); i++){
-    initializeParameters();
-    cout << "Data file name is "<< dataFiles[i];
-    datainput(expectedOutput, inputValues, dataFiles[i]);
-    datastandarization(inputValues);
-    for(int i = 0;i < feature_num;i++)
-    {
-      weight[i] = 0.01;
-    }
-    //check values for proper input into vectors
-    // for(int i = 0; i < inputValues.size(); i++) 
-    // {
-    //   for(int j = 0; j < feature_num; j++) 
-    //   {
-    //     cout<<inputValues[i][j]<<" ";
-    //   }
-    //   cout<<endl;
-    // }
-    // cout<<"inputValues.size(); = "<<inputValues.size()<<endl; 
-    // inputValues.size() = 469
-    // cout<<"inputValues[0].size(); = "<<inputValues[0].size()<<endl; 
-    // inputValues[0].size() = 31
-    
-    while(epoch--) 
-    {
-        cout<<"Epoch "<<(100-epoch)<<" ";
-        calculateAccuracy();
-        for(int i = 0; i < inputValues.size(); i++) 
-        {
-            double predictedValue, z = 0;
-            for(int j = 1; j < inputValues[0].size(); j++) 
-            {
-              z += weight[j-1] * inputValues[i][j];
-            }
-            predictedValue = activation(z);
-            updateWeight(predictedValue, expectedOutput[i], inputValues[i]);
-        }
-    }
-    calculateAccuracy();
-
-    
-  }
+  MPI_Init(NULL, NULL);
+  MPI_Comm_rank(MPI_COMM_WORLD, &globalrank);
+  MPI_Get_processor_name(processor_name, &name_len);
+  
+  cout << "Process ID is " << globalrank << " on node " << processor_name << endl;
+  trainlogisticregressionmodel();
+  calculateAccuracy();
   test();
+  MPI_Finalize();
   return 0 ;
 }
 
+
+void trainlogisticregressionmodel()
+{
+  string dataFile = "data.csv";
+  initializeParameters();
+  //cout << "Data file name is "<< dataFile;
+  datainput(expectedOutput, inputValues, dataFile);
+  datastandarization(inputValues);
+  for(int i = 0;i < feature_num;i++)
+  {
+    weight[i] = 0.01;
+  }
+  //check values for proper input into vectors
+  // for(int i = 0; i < inputValues.size(); i++) 
+  // {
+  //   for(int j = 0; j < feature_num; j++) 
+  //   {
+  //     cout<<inputValues[i][j]<<" ";
+  //   }
+  //   cout<<endl;
+  // }
+  // cout<<"inputValues.size(); = "<<inputValues.size()<<endl; 
+  // inputValues.size() = 469
+  // cout<<"inputValues[0].size(); = "<<inputValues[0].size()<<endl; 
+  // inputValues[0].size() = 31
+  
+  while(epoch--) 
+  {
+      //cout<<"Epoch "<<(100-epoch)<<" ";
+      calculateAccuracy();
+      for(int i = 0; i < inputValues.size(); i++) 
+      {
+          double predictedValue, z = 0;
+          for(int j = 1; j < inputValues[0].size(); j++) 
+          {
+            z += weight[j-1] * inputValues[i][j];
+          }
+          predictedValue = activation(z);
+          updateWeight(predictedValue, expectedOutput[i], inputValues[i]);
+      }
+  }
+}
 
 void initializeParameters()
 {
@@ -116,7 +129,7 @@ void calculateAccuracy()
       totalCorrect++;
     }
   }
-  cout<<"Accuracy is: "<<(totalCorrect * 100) / totalCases<<"%"<<endl;
+  //cout<<"Accuracy is: "<<(totalCorrect * 100) / totalCases<<"%"<<endl;
 }
 
 void updateWeight(double predictedValue, double expectedOutput, vector<double> inputValue) 
@@ -133,7 +146,7 @@ void test()
 {
   double z = 0;
   int totalCorrect = 0;
-  cout<<"Validation Data File Name: " << validationFile;
+  //cout<<"Validation Data File Name: " << validationFile;
   datainput(Validation_expectedOutput, Validation_inputValues, validationFile);
   datastandarization(Validation_inputValues);
   for(int i = 0; i < Validation_inputValues.size(); i++) 
@@ -151,7 +164,7 @@ void test()
       totalCorrect++;
     }
   }
-  cout<<"Validation Accuracy is: "<<(totalCorrect * 100) / Validation_inputValues.size()<<"%"<<endl;
+  //cout<<"Validation Accuracy is: "<<(totalCorrect * 100) / Validation_inputValues.size()<<"%"<<endl;
 }
 
 void datainput(vector<double> &expectedOutput1, vector<vector<double>> &inputValues1, string filename)
@@ -166,7 +179,7 @@ void datainput(vector<double> &expectedOutput1, vector<vector<double>> &inputVal
   }
   else
   {
-    cout<<"File opened  successfully\n";          
+    //cout<<"File opened  successfully\n";          
   }
   getline(myfile,line);//to skip the first catagory sentense
   while(getline(myfile,line)) // input data into C++
