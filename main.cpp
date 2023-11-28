@@ -4,6 +4,9 @@
 #include<fstream>
 #include<string>
 #include <mpi.h>
+#include<time.h>
+#include<omp.h>
+
 
 #define feature_num 30
 using namespace std;
@@ -32,18 +35,28 @@ void test();
 void datainput(vector<double> &expectedOutput1, vector<vector<double>> &inputValues1, string filename);
 void datastandarization(vector<vector<double>> &inputValues2);
 void trainlogisticregressionmodel();
+void paralleltrainlogisticregressionmodel();
 void initializeParameters();
 
 
 int main()
 {
+  double time;
+  struct timespec start, stop; 
   MPI_Init(NULL, NULL);
   MPI_Comm_rank(MPI_COMM_WORLD, &globalrank);
   MPI_Get_processor_name(processor_name, &name_len);
   
   cout << "Process ID is " << globalrank << " on node " << processor_name << endl;
+	if( clock_gettime(CLOCK_REALTIME, &start) == -1) 
+	{
+	  perror("clock gettime");
+	}   
   trainlogisticregressionmodel();
   calculateAccuracy();
+  if( clock_gettime( CLOCK_REALTIME, &stop) == -1 ) { perror("clock gettime");}		
+	time = (stop.tv_sec - start.tv_sec)+ (double)(stop.tv_nsec - start.tv_nsec)/1e9;
+	printf("Execution time = %f sec\n",time);	
   test();
   MPI_Finalize();
   return 0 ;
@@ -74,7 +87,8 @@ void trainlogisticregressionmodel()
   // inputValues.size() = 469
   // cout<<"inputValues[0].size(); = "<<inputValues[0].size()<<endl; 
   // inputValues[0].size() = 31
-  
+
+   
   while(epoch--) 
   {
       //cout<<"Epoch "<<(100-epoch)<<" ";
@@ -91,6 +105,64 @@ void trainlogisticregressionmodel()
       }
   }
 }
+
+
+void paralleltrainlogisticregressionmodel()
+{
+  string dataFile = "data.csv";
+  initializeParameters();
+  //cout << "Data file name is "<< dataFile;
+  datainput(expectedOutput, inputValues, dataFile);
+  datastandarization(inputValues);
+  for(int i = 0;i < feature_num;i++)
+  {
+    weight[i] = 0.01;
+  }
+  //check values for proper input into vectors
+  // for(int i = 0; i < inputValues.size(); i++) 
+  // {
+  //   for(int j = 0; j < feature_num; j++) 
+  //   {
+  //     cout<<inputValues[i][j]<<" ";
+  //   }
+  //   cout<<endl;
+  // }
+  // cout<<"inputValues.size(); = "<<inputValues.size()<<endl; 
+  // inputValues.size() = 469
+  // cout<<"inputValues[0].size(); = "<<inputValues[0].size()<<endl; 
+  // inputValues[0].size() = 31
+
+   
+  while(epoch--) 
+  {
+    //cout<<"Epoch "<<(100-epoch)<<" ";
+    calculateAccuracy();
+    #pragma omp parallel num_threads(10)
+    {
+      //const int thread_id = omp_get_thread_num();
+      #pragma omp for
+      for(int i = 0; i < inputValues.size(); i++) 
+      {
+        double predictedValue, z = 0;
+        for(int j = 1; j < inputValues[0].size(); j++) 
+        {
+        //#pragma omp critical
+        //{
+            z += weight[j-1] * inputValues[i][j];
+        //}
+        }
+            predictedValue = activation(z);
+        //#pragma omp critical
+        //{
+            updateWeight(predictedValue, expectedOutput[i], inputValues[i]);
+        //} 
+        //cout<<"data: "<<i<<", thread = "<<thread_id<<endl;               
+        }
+      }
+  }
+}
+
+
 
 void initializeParameters()
 {
@@ -237,7 +309,7 @@ void datastandarization(vector<vector<double>> &inputValues2)
     {
       sum += inputValues2[j][i];
     }
-    mean = sum/inputValues2.size();
+    mean = sum/inputValues2.size(); 
 
     for(int j = 0; j < inputValues2.size(); j++) // calculate variance and SD
     {
