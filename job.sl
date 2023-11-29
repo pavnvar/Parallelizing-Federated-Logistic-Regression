@@ -5,7 +5,7 @@
 #SBATCH --constraint="xeon-4116"
 #SBATCH --mem-per-cpu=3GB
 #SBATCH --time=00:05:00
-#SBATCH --output=mpijob_%N.out
+#SBATCH --output=mpijob.out
 
 #SBATCH --error=mpijob.err
 
@@ -28,8 +28,7 @@ ulimit -s unlimited
 # srun -n 1 -N 1 mpirun -np 1 ./logistic_regression &
 
 
-mpirun -np $SLURM_NTASKS ./logistic_regression ./logistic_regression ./logistic_regression ./logistic_regression  
-
+mpirun -np $SLURM_NTASKS ./logistic_regression
 
 
 
