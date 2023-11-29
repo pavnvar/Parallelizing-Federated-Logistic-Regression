@@ -9,6 +9,8 @@
 
 
 #define feature_num 30
+#define training_nodes 4
+
 using namespace std;
 
 vector<double> expectedOutput;
@@ -21,7 +23,8 @@ string validationFile = "validation.csv";
 
 double e;
 long epoch;
-double weight[feature_num]={0};
+double weight[feature_num];
+double nodeReceivedTrainedWeights[training_nodes][feature_num] = {0};
 double learningRate;
 int globalrank;
 
@@ -37,36 +40,78 @@ void datastandarization(vector<vector<double>> &inputValues2);
 void trainlogisticregressionmodel();
 void paralleltrainlogisticregressionmodel();
 void initializeParameters();
-
+void FederatedLearningWithMPIReducePrimitive();
+void FederatedLearningWithSendReceivePrimitive();
 
 int main()
 {
-  double time;
-  struct timespec start, stop; 
+  initializeParameters();
   MPI_Init(NULL, NULL);
   MPI_Comm_rank(MPI_COMM_WORLD, &globalrank);
   MPI_Get_processor_name(processor_name, &name_len);
-  
   cout << "Process ID is " << globalrank << " on node " << processor_name << endl;
-	if( clock_gettime(CLOCK_REALTIME, &start) == -1) 
-	{
-	  perror("clock gettime");
-	}   
-  trainlogisticregressionmodel();
-  calculateAccuracy();
-  if( clock_gettime( CLOCK_REALTIME, &stop) == -1 ) { perror("clock gettime");}		
-	time = (stop.tv_sec - start.tv_sec)+ (double)(stop.tv_nsec - start.tv_nsec)/1e9;
-	printf("Execution time = %f sec\n",time);	
-  test();
+  //FederatedLearningWithMPIReducePrimitive();
+  FederatedLearningWithSendReceivePrimitive();
   MPI_Finalize();
   return 0 ;
 }
 
+void FederatedLearningWithMPIReducePrimitive()
+{
+  if(globalrank != 0){
+    trainlogisticregressionmodel();
+    calculateAccuracy();
+  }
+  MPI_Reduce( (globalrank == 0) ? MPI_IN_PLACE : weight, weight, feature_num, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  if(globalrank == 0){
+    for (int i = 0; i < feature_num; ++i)
+    {
+        weight[i] = weight[i]/4;
+        cout << weight[i] << " ";
+    }  
+    cout << endl;
+    test();
+  }
+}
+
+
+void FederatedLearningWithSendReceivePrimitive()
+{
+
+  if(globalrank == 0)
+  {
+      //Receive weights from all the prcoess ranked 1,2,3,4
+      for(int sender_node=0 ; sender_node<4; sender_node++)
+      {
+        MPI_Recv(nodeReceivedTrainedWeights[sender_node], feature_num, MPI_DOUBLE, sender_node+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        cout << "Received weights from process  "<< sender_node+1;
+        for (int i = 0; i < feature_num; ++i)
+        {
+            cout << nodeReceivedTrainedWeights[sender_node][i] << " ";
+            weight[i] += nodeReceivedTrainedWeights[sender_node][i];
+        }  
+      }
+      
+      for (int i = 0; i < feature_num; ++i)
+      {
+          weight[i] = weight[i]/4;
+          cout << weight[i] << " ";
+      }  
+      cout << endl;
+      test();
+  }
+
+  if(globalrank != 0){
+      trainlogisticregressionmodel();
+      //Send all the weights to process 0
+      MPI_Send(weight, feature_num, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+      calculateAccuracy();
+  }
+}
 
 void trainlogisticregressionmodel()
 {
   string dataFile = "data.csv";
-  initializeParameters();
   //cout << "Data file name is "<< dataFile;
   datainput(expectedOutput, inputValues, dataFile);
   datastandarization(inputValues);
@@ -172,7 +217,10 @@ void initializeParameters()
   inputValues.clear();
   e = 2.71828;
   epoch = 100;
-  weight[feature_num]={0};
+  for(int feature_index=0; feature_index<feature_num; feature_index++)
+  {
+    weight[feature_index] = 0;
+  }
   learningRate = 0.001;
 }
 
@@ -236,7 +284,7 @@ void test()
       totalCorrect++;
     }
   }
-  //cout<<"Validation Accuracy is: "<<(totalCorrect * 100) / Validation_inputValues.size()<<"%"<<endl;
+  cout<<"Validation Accuracy is: "<<(totalCorrect * 100) / Validation_inputValues.size()<<"%"<<endl;
 }
 
 void datainput(vector<double> &expectedOutput1, vector<vector<double>> &inputValues1, string filename)
