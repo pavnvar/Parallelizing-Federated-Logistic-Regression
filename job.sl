@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --nodes=5
-#SBATCH --ntasks=5
+#SBATCH --nodes=30
+#SBATCH --ntasks=30
 #SBATCH --cpus-per-task=1
 #SBATCH --constraint="xeon-4116"
 #SBATCH --mem-per-cpu=3GB

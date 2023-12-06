@@ -9,7 +9,7 @@
 
 
 #define feature_num 30
-#define training_nodes 4
+#define training_nodes 30
 
 using namespace std;
 
@@ -45,14 +45,21 @@ void FederatedLearningWithSendReceivePrimitive();
 
 int main()
 {
+  double time;
+  struct timespec start, stop; 
+  clock_gettime(CLOCK_REALTIME, &start);
   initializeParameters();
   MPI_Init(NULL, NULL);
   MPI_Comm_rank(MPI_COMM_WORLD, &globalrank);
   MPI_Get_processor_name(processor_name, &name_len);
   cout << "Process ID is " << globalrank << " on node " << processor_name << endl;
-  //FederatedLearningWithMPIReducePrimitive();
-  FederatedLearningWithSendReceivePrimitive();
+  FederatedLearningWithMPIReducePrimitive();
+  //FederatedLearningWithSendReceivePrimitive();
   MPI_Finalize();
+  clock_gettime( CLOCK_REALTIME, &stop);
+  time = (stop.tv_sec - start.tv_sec)+ (double)(stop.tv_nsec - start.tv_nsec)/1e9;
+  cout<<"Execution time on node: "<<processor_name<<" is "<<time<<endl;
+
   return 0 ;
 }
 
@@ -62,11 +69,17 @@ void FederatedLearningWithMPIReducePrimitive()
     trainlogisticregressionmodel();
     calculateAccuracy();
   }
+  double time;
+  struct timespec start, stop; 
+  clock_gettime(CLOCK_REALTIME, &start);
   MPI_Reduce( (globalrank == 0) ? MPI_IN_PLACE : weight, weight, feature_num, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  clock_gettime(CLOCK_REALTIME, &stop);
+  time = (stop.tv_sec - start.tv_sec)+ (double)(stop.tv_nsec - start.tv_nsec)/1e9;
+  cout<<"MPI Reduce Execution time on node: "<<processor_name<<" is "<<time<<endl;
   if(globalrank == 0){
     for (int i = 0; i < feature_num; ++i)
     {
-        weight[i] = weight[i]/4;
+        weight[i] = weight[i]/training_nodes;
         cout << weight[i] << " ";
     }  
     cout << endl;
@@ -81,9 +94,15 @@ void FederatedLearningWithSendReceivePrimitive()
   if(globalrank == 0)
   {
       //Receive weights from all the prcoess ranked 1,2,3,4
+      double time=0;
       for(int sender_node=0 ; sender_node<4; sender_node++)
       {
+        
+        struct timespec start, stop; 
+        clock_gettime(CLOCK_REALTIME, &start);
         MPI_Recv(nodeReceivedTrainedWeights[sender_node], feature_num, MPI_DOUBLE, sender_node+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        clock_gettime(CLOCK_REALTIME, &stop);
+        time += (stop.tv_sec - start.tv_sec)+ (double)(stop.tv_nsec - start.tv_nsec)/1e9;
         cout << "Received weights from process  "<< sender_node+1;
         for (int i = 0; i < feature_num; ++i)
         {
@@ -91,10 +110,10 @@ void FederatedLearningWithSendReceivePrimitive()
             weight[i] += nodeReceivedTrainedWeights[sender_node][i];
         }  
       }
-      
+      cout<<"MPI Receive Execution time on node: "<<processor_name<<" is "<<time<<endl;
       for (int i = 0; i < feature_num; ++i)
       {
-          weight[i] = weight[i]/4;
+          weight[i] = weight[i]/training_nodes;
           cout << weight[i] << " ";
       }  
       cout << endl;
@@ -102,9 +121,16 @@ void FederatedLearningWithSendReceivePrimitive()
   }
 
   if(globalrank != 0){
-      trainlogisticregressionmodel();
+      //trainlogisticregressionmodel();
+      paralleltrainlogisticregressionmodel();
       //Send all the weights to process 0
+      double time=0;
+      struct timespec start, stop; 
+      clock_gettime(CLOCK_REALTIME, &start);
       MPI_Send(weight, feature_num, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+      clock_gettime(CLOCK_REALTIME, &stop);
+      time = (stop.tv_sec - start.tv_sec)+ (double)(stop.tv_nsec - start.tv_nsec)/1e9;
+      cout<<"MPI send Execution time on node: "<<processor_name<<" is "<<time<<endl;
       calculateAccuracy();
   }
 }
